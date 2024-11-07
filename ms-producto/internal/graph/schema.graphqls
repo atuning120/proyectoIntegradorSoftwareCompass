@@ -1,0 +1,30 @@
+type Curso {
+  id: ID!
+  nombre: String!
+  descripcion: String!
+  precio: Float!
+  imagen: String!
+  categoria: String!
+  nivel: String!
+  puntuacion: Float!
+}
+
+input NewCurso {
+  nombre: String!
+  descripcion: String!
+  precio: Float!
+  imagen: String!
+  categoria: String!
+  nivel: String!
+  puntuacion: Float!
+}
+
+type Query {
+  cursos: [Curso!]!
+  topCursos: [Curso!]!
+  cursosPorId(ids: [ID!]!, userId: ID!): [Curso!]!
+}
+
+type Mutation {
+  crearCurso(input: NewCurso!): Curso!
+}

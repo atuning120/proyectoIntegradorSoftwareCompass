@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "es2016",                // Configura el nivel de JavaScript a ES2016
+    "module": "commonjs",               // Usa CommonJS, que es estándar para Node.js
+    "rootDir": "./src",                 // Directorio raíz para los archivos TypeScript
+    "outDir": "./dist",                 // Carpeta de salida para los archivos compilados
+    "esModuleInterop": true,            // Permite importar módulos CommonJS más fácilmente
+    "forceConsistentCasingInFileNames": true,  // Asegura consistencia en nombres de archivos
+    "skipLibCheck": true,               // Ignora la verificación de tipos en archivos .d.ts
+    "strict": true,                     // Habilita opciones de verificación estricta de tipos
+
+    /* Modules */
+    "resolveJsonModule": true           // Habilita la importación de archivos JSON
+  },
+  "include": ["src/**/*"],               // Incluye todos los archivos en src
+  "exclude": ["node_modules", "dist"]    // Excluye node_modules y dist
+}

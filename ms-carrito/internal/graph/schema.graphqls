@@ -1,0 +1,27 @@
+type Carrito {
+  id: ID!
+  idUsuario: ID!
+  idProductos: [ID!]!
+}
+
+input AgregarProductoInput {
+  IDUsuario: ID!
+  IDProducto: ID!
+}
+
+input EliminarProductoInput {
+  IDUsuario: ID!
+  IDProducto: ID!
+}
+
+type Query {
+  ObtenerCarritos: [Carrito!]!
+  ObtenerCarrito(id: ID!): Carrito 
+}
+
+
+type Mutation {
+  AgregarProducto(input: AgregarProductoInput!): Carrito!
+  EliminarProducto(input: EliminarProductoInput!): Carrito!
+  VaciarCarrito(idUsuario: ID!): Carrito!
+}
