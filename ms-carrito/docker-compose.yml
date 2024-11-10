@@ -12,6 +12,19 @@ services:
     networks:
       - rabbitmq_network
 
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_container
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - rabbitmq_network
+
 networks:
   rabbitmq_network:
     driver: bridge
+
+volumes:
+  mongo_data:
