@@ -8,15 +8,14 @@ import (
 	"context"
 	"fmt"
 
-	crud "github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/CRUD"
 	"github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/connection"
 	"github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/consumer"
 	"github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/graph/model"
+	"github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/models"
 	"github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/repository"
 	"github.com/atuning120/proyectoIntegradorSoftware/ms-producto/internal/service"
 )
 
-// Resolver de la Mutation crearCurso
 func (r *mutationResolver) CrearCurso(ctx context.Context, input model.NewCurso) (*model.Curso, error) {
 	// Obtener conexión a MongoDB
 	client, err := connection.ConnectToMongoDB()
@@ -24,8 +23,8 @@ func (r *mutationResolver) CrearCurso(ctx context.Context, input model.NewCurso)
 		return nil, fmt.Errorf("error conectando a la base de datos: %v", err)
 	}
 
-	// Crear un nuevo producto en la base de datos
-	nuevoCurso := crud.Product{
+	// Crear el curso sin especificar el ID
+	nuevoCurso := models.Product{
 		Nombre:      input.Nombre,
 		Descripcion: input.Descripcion,
 		Precio:      input.Precio,
@@ -35,13 +34,23 @@ func (r *mutationResolver) CrearCurso(ctx context.Context, input model.NewCurso)
 		Puntuacion:  input.Puntuacion,
 	}
 
-	err = crud.CreateProduct(client, nuevoCurso)
+	// Inicializar el repositorio y el servicio
+	db := client.Database("Producto")
+	repo := repository.NewProductoRepositoryImpl(db)
+	serv := service.NewProductoServiceImpl(repo)
+
+	// Llamar al servicio para crear el producto y obtener el ObjectID generado
+	oid, err := serv.CrearProducto(ctx, nuevoCurso)
 	if err != nil {
-		return nil, fmt.Errorf("error al crear el curso: %v", err)
+		return nil, err
 	}
 
-	// Convertir a tipo GraphQL y retornar
+	// Asignar el ObjectID generado al campo ID de nuevoCurso
+	nuevoCurso.ID = oid
+
+	// Convertir el curso a tipo GraphQL y retornar con el ID generado
 	return &model.Curso{
+		ID:          nuevoCurso.ID.Hex(), // Convertir ObjectID a string
 		Nombre:      nuevoCurso.Nombre,
 		Descripcion: nuevoCurso.Descripcion,
 		Precio:      nuevoCurso.Precio,
@@ -52,7 +61,6 @@ func (r *mutationResolver) CrearCurso(ctx context.Context, input model.NewCurso)
 	}, nil
 }
 
-// Cursos is the resolver for the cursos field.
 func (r *queryResolver) Cursos(ctx context.Context) ([]*model.Curso, error) {
 	// Obtener conexión a MongoDB
 	client, err := connection.ConnectToMongoDB()
@@ -60,8 +68,13 @@ func (r *queryResolver) Cursos(ctx context.Context) ([]*model.Curso, error) {
 		return nil, fmt.Errorf("error conectando a la base de datos: %v", err)
 	}
 
-	// Obtener todos los productos (cursos) de la base de datos
-	cursosDB, err := crud.GetAllCursos(client)
+	// Inicializar el repositorio y servicio
+	db := client.Database("Producto")
+	repo := repository.NewProductoRepositoryImpl(db)
+	serv := service.NewProductoServiceImpl(repo)
+
+	// Llamar al servicio para obtener todos los cursos
+	cursosDB, err := serv.GetAllCursos(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +83,7 @@ func (r *queryResolver) Cursos(ctx context.Context) ([]*model.Curso, error) {
 	var cursos []*model.Curso
 	for _, cursoDB := range cursosDB {
 		curso := &model.Curso{
-			ID:          cursoDB.ID,
+			ID:          cursoDB.ID.Hex(), // Convertir ObjectID a string
 			Nombre:      cursoDB.Nombre,
 			Descripcion: cursoDB.Descripcion,
 			Precio:      cursoDB.Precio,
@@ -93,8 +106,13 @@ func (r *queryResolver) TopCursos(ctx context.Context) ([]*model.Curso, error) {
 		return nil, fmt.Errorf("error conectando a la base de datos: %v", err)
 	}
 
-	// Obtener los 4 mejores cursos de la base de datos
-	topCursosDB, err := crud.GetTopCursos(client)
+	// Inicializar el repositorio y servicio
+	db := client.Database("Producto")
+	repo := repository.NewProductoRepositoryImpl(db)
+	serv := service.NewProductoServiceImpl(repo)
+
+	// Llamar al servicio para obtener los 4 cursos con mayor puntuación
+	topCursosDB, err := serv.GetTopCursos(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +121,7 @@ func (r *queryResolver) TopCursos(ctx context.Context) ([]*model.Curso, error) {
 	var topCursos []*model.Curso
 	for _, cursoDB := range topCursosDB {
 		curso := &model.Curso{
-			ID:          cursoDB.ID,
+			ID:          cursoDB.ID.Hex(), // Convertir ObjectID a string
 			Nombre:      cursoDB.Nombre,
 			Descripcion: cursoDB.Descripcion,
 			Precio:      cursoDB.Precio,
