@@ -44,6 +44,17 @@ app.all("/carrito", (req: Request, res: Response, next: NextFunction) => {
     }); 
 });
 
+// Redirige al ms-pago
+app.all("/pago", (req: Request, res: Response, next: NextFunction) => {
+    req.url = req.url.replace('/pago', ''); // Elimina el prefijo para la redirección
+    apiProxy.web(req, res, { target: 'http://localhost:3001/create' }, function(e) {
+        if (e) {
+            console.error(e);
+            next(e);
+        }
+    });
+});
+
 // Manejo de errores
 app.use(function(err: any, req: Request, res: Response, next: NextFunction) {
     console.error(err.stack); 
