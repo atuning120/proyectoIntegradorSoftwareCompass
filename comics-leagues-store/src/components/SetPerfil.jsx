@@ -178,7 +178,7 @@ const SetPerfil = () => {
                     onChange={(evento) => setCorreo(evento.target.value)}
                 />
                 <button
-                    className="bg-gray-900 hover:bg-gray-950 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out relative"
+                    className="bg-gray-900 hover:bg-gray-950 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out relative active:font-extrabold"
                     onClick={handleEnviarCambios}
                 >
                     Guardar Cambios
