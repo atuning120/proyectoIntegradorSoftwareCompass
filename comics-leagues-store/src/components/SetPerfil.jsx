@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
-import {CircularProgress} from "@nextui-org/react";
+import { CircularProgress } from "@nextui-org/react";
+import { useMutation, gql } from '@apollo/client';
+import { userClient } from '../apolloClient';
+import { useNavigate } from 'react-router-dom';
+import Tostadas from './Tostadas';
+import { ToastContainer } from "react-toastify";
 
+
+// Función para verificar si el usuario está autenticado
 const isAuthenticated = () => {
     try {
         return localStorage.getItem('token');
@@ -10,20 +17,69 @@ const isAuthenticated = () => {
     }
 };
 
+const isEmptyOrWhitespace = (str) => {
+    return !str.trim();//quita todos los " " del string 
+  };
 
-const SetPerfil = () =>{
+// Función para cerrar sesión
+const logout = () => {
+    window.dispatchEvent(new Event('userLoggedOut'));
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+};
+
+const MODIFICAR_NOMBRE = gql`
+  mutation modificarUsuarioNombre($idUsuario: String!, $input: ModificarNombre!) {
+    modificarUsuarioNombre(idUsuario: $idUsuario, input: $input) {
+      id
+      nombre
+    }
+  }
+`;
+
+const MODIFICAR_APELLIDO = gql`
+  mutation modificarUsuarioApellido($idUsuario: String!, $input: ModificarApellido!) {
+    modificarUsuarioApellido(idUsuario: $idUsuario, input: $input) {
+      apellido
+    }
+  }
+`;
+
+const MODIFICAR_USERNAME = gql`
+  mutation modificarUsuarioUserName($idUsuario: String!, $input: ModificarUserName!) {
+    modificarUsuarioUserName(idUsuario: $idUsuario, input: $input) {
+      username
+    }
+  }
+`;
+
+const MODIFICAR_CORREO = gql`
+  mutation modificarUsuarioCorreo($idUsuario: String!, $input: ModificarCorreo!) {
+    modificarUsuarioCorreo(idUsuario: $idUsuario, input: $input) {
+      correo
+    }
+  }
+`;
+
+const SetPerfil = () => {
     const [userObj, setUserObj] = useState(null);
-
     const [nombre, setNombre] = useState('');
     const [apellido, setApellido] = useState('');
     const [username, setUsername] = useState('');
     const [correo, setCorreo] = useState('');
-    const [loading,setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
 
     const token = isAuthenticated();
+    const navigate = useNavigate(); //hook de react-router-dom para redirigir
 
-    useEffect(() =>{
-        if(token){
+    // Llamadas a gql para cada atributo
+    const [modificarNombre] = useMutation(MODIFICAR_NOMBRE, { client: userClient });
+    const [modificarApellido] = useMutation(MODIFICAR_APELLIDO, { client: userClient });
+    const [modificarUsername] = useMutation(MODIFICAR_USERNAME, { client: userClient });
+    const [modificarCorreo] = useMutation(MODIFICAR_CORREO, { client: userClient });
+
+    useEffect(() => {
+        if (token) {
             try {
                 const user = JSON.parse(localStorage.getItem('user'));
                 setUserObj(user);
@@ -33,79 +89,104 @@ const SetPerfil = () =>{
                     setUsername(user.username);
                     setCorreo(user.correo);
                 }
-                else{
-                    console.log("no hay errores pero tampoco hay datos xd");
-                }
-
-
             } catch (error) {
-                console.error("que paso aca: "+error);
-            }
-            finally{
+                console.error("Error:", error);
+            } finally {
                 setLoading(false);
             }
-
         }
+    }, [token]);
 
-    },[token]);//se ejecuta 'useEffect(()=>{})'cada vez que el token cambie
-    
-    if(loading){
-        return <CircularProgress aria-label="Loading..."/>;
-    }
-
-    if(!token || !userObj){
-        return (<h1 className="flex justify-center text-3xl text-red-600">ERROR: Falta iniciar sesion</h1>);//return corta la funcion aqui
+    if (loading) {
+        return <CircularProgress aria-label="Loading..." />;
     }
 
 
+    const handleLogout = () => {
+        logout(); // Cierra la sesión
 
-    const handleEnviarCambios = () =>{
-        console.log("Estos datos se enviarian: ");
-        console.log("nombre: "+nombre);
-        console.log("apellido: "+apellido);
-        console.log("username: "+username);
-        console.log("correo: "+correo);
+        //mostramos el toast(alerta lateral de color verde)
+        Tostadas.ToastSuccess('Tus datos han cambiado. Vuelve a iniciar sesión.');
+        setTimeout(() => {
+            navigate('/'); //redirige al home
+        }, 2000); //2 segundos
     };
 
+    const handleEnviarCambios = async () => {
+        let hasChanged = false;
+        try {
+            if(isEmptyOrWhitespace(nombre) || isEmptyOrWhitespace(apellido) || 
+            isEmptyOrWhitespace(username) || isEmptyOrWhitespace(correo))  {
+                Tostadas.ToastWarning("No intentes enviar campos vacíos");
+                return;
+            }
+            if (nombre !== userObj.nombre) {
+                await modificarNombre({ variables: { idUsuario: userObj.id, input: { nombre } } });
+                hasChanged = true;
+            }
+            if (apellido !== userObj.apellido) {
+                await modificarApellido({ variables: { idUsuario: userObj.id, input: { apellido } } });
+                hasChanged = true;
+            }
+            if (correo !== userObj.correo) {
+                await modificarCorreo({ variables: { idUsuario: userObj.id, input: { correo } } });
+                hasChanged = true;
+            }
+            if (username !== userObj.username) {
+                await modificarUsername({ variables: { idUsuario: userObj.id, input: { username } } });
+                hasChanged = true;
+            }
+        } catch (error) {
+            console.error("Error modificando datos:", error);
+            Tostadas.ToastError("Error modificando datos:", error);
+        } finally {
+            if (hasChanged) {
+                handleLogout(); // Llamamos a handleLogout que maneja el toast y la redirección
+            }
+            else{
+                Tostadas.ToastInfo('No hubo cambios en tus datos.');
+            }
+        }
+    };
 
-    return(
-    <div className="mt-8 p-4 flex justify-center mr-16">
-        <div className="w-[60%] bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
-            <h1 className="text-4xl font-bold mb-28">Modificar datos</h1>
-            <input className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6" 
-            placeholder={`Nombre: ${userObj.nombre || ''}`}
-            value={nombre}
-            onChange={(evento) => setNombre(evento.target.value)}
-            >
-            </input>
-
-            <input className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6" 
-            placeholder={`Apellido: ${userObj.apellido || ''}`}
-            value={apellido}
-            onChange={(evento) => setApellido(evento.target.value)}
-            >
-            </input>
-
-            <input className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6" 
-            placeholder={`Alias: ${userObj.username || ''}`}
-            value={username}
-            onChange={(evento) => setUsername(evento.target.value)}
-            >
-            </input>
-
-            <input className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6" 
-            placeholder={`Correo: ${userObj.correo || ''}`}
-            value={correo}
-            onChange={(evento) => setCorreo(evento.target.value)}
-            >
-            </input>
-
-            <button className="bg-gray-900 hover:bg-gray-950 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out relative" onClick={handleEnviarCambios}>
-                Guardar Cambios
-            </button>
-
+    return (
+        <div className="mt-8 p-4 flex justify-center mr-16">
+            <div className="w-[60%] bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
+                <h1 className="text-4xl font-bold mb-28">Modificar datos</h1>
+                <input
+                    className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6"
+                    placeholder={`Nombre: ${userObj.nombre || ''}`}
+                    value={nombre}
+                    onChange={(evento) => setNombre(evento.target.value)}
+                />
+                <input
+                    className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6"
+                    placeholder={`Apellido: ${userObj.apellido || ''}`}
+                    value={apellido}
+                    onChange={(evento) => setApellido(evento.target.value)}
+                />
+                <input
+                    className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6"
+                    placeholder={`Alias: ${userObj.username || ''}`}
+                    value={username}
+                    onChange={(evento) => setUsername(evento.target.value)}
+                />
+                <input
+                    className="w-[450px] text-2xl relative hover:bg-gray-200 rounded-sm mb-6"
+                    placeholder={`Correo: ${userObj.correo || ''}`}
+                    value={correo}
+                    onChange={(evento) => setCorreo(evento.target.value)}
+                />
+                <button
+                    className="bg-gray-900 hover:bg-gray-950 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out relative"
+                    onClick={handleEnviarCambios}
+                >
+                    Guardar Cambios
+                </button>
+            </div>
+            <ToastContainer/>
         </div>
-    </div>
     );
 };
+
 export default SetPerfil;
