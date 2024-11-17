@@ -4,16 +4,6 @@ import { useQuery, useMutation, gql } from '@apollo/client';
 import { cartClient, productClient } from '../apolloClient';
 import { Button } from "@nextui-org/react";
 
-const OBTENER_CARRITO = gql`
-  query ObtenerCarrito($id: ID!) {
-    ObtenerCarrito(id: $id) {
-      id
-      idUsuario
-      idProductos
-    }
-  }
-`;
-
 const CURSOS_POR_ID = gql`
   query CursosPorId($ids: [ID!]!, $userId: ID!) {
     cursosPorId(ids: $ids, userId: $userId) {
@@ -39,42 +29,30 @@ const ELIMINAR_PRODUCTO = gql`
   }
 `;
 
-export const CartModal = ({ isOpen, closeModal }) => {
+const isAuthenticated = () => {
+  const token = localStorage.getItem('token');
+  return !!token;
+};
+
+const ExtraerIdUsuario = () => {
+  if (isAuthenticated()) {
+    const user = JSON.parse(localStorage.getItem('user'));
+    return user?.id || null;
+  } else {
+    return null;
+  }
+};
+
+const userId = ExtraerIdUsuario();
+
+export const CartModal = ({ isOpen, closeModal, cartItems }) => {
   const [errorMessage, setErrorMessage] = useState('');
-  const [cartData, setCartData] = useState([]);
   const [productDetails, setProductDetails] = useState([]);
 
-  const isAuthenticated = () => {
-    const token = localStorage.getItem('token');
-    return !!token;
-  };
-
-  const ExtraerIdUsuario = () => {
-    if (isAuthenticated()) {
-      const user = JSON.parse(localStorage.getItem('user'));
-      return user?.id || null;
-    } else {
-      return null;
-    }
-  };
-
-  const userId = ExtraerIdUsuario();
-
-  // Query para obtener el carrito
-  const { data: cartDataResult, loading: loadingCart, refetch: refetchCart } = useQuery(OBTENER_CARRITO, {
-    variables: { id: userId },
-    skip: !userId,
-    client: cartClient,
-    onError: (error) => {
-      setErrorMessage('Error al cargar el carrito. Mostrando carrito vacío.');
-      console.error('Detalles del error:', error);
-    },
-  });
-
-  // Query para obtener los detalles de los productos en el carrito
+  // Query para obtener los detalles de los productos en el carrito usando cartItems directamente
   const { refetch: refetchProductDetails } = useQuery(CURSOS_POR_ID, {
-    variables: { ids: cartData, userId },
-    skip: cartData.length === 0 || !userId,
+    variables: { ids: cartItems, userId },
+    skip: cartItems.length === 0 || !userId,
     client: productClient,
     onCompleted: (data) => {
       if (data && data.cursosPorId) {
@@ -87,24 +65,10 @@ export const CartModal = ({ isOpen, closeModal }) => {
     },
   });
 
-  useEffect(() => {
-    const fetchCartAndProducts = async () => {
-      if (cartDataResult && cartDataResult.ObtenerCarrito) {
-        const cartProducts = cartDataResult.ObtenerCarrito.idProductos;
-        setCartData(cartProducts);
-        await refetchProductDetails({ ids: cartProducts, userId });
-      }
-    };
-
-    if (cartDataResult) {
-      fetchCartAndProducts();
-    }
-  }, [cartDataResult, userId, refetchProductDetails]);
-
+  // Mutation para eliminar un producto del carrito
   const [eliminarProducto] = useMutation(ELIMINAR_PRODUCTO, {
     onCompleted: (data) => {
       const updatedCartData = data.EliminarProducto.idProductos;
-      setCartData(updatedCartData);
       refetchProductDetails({ ids: updatedCartData, userId }); // Refresca los detalles de los productos
       setErrorMessage(''); // Limpia cualquier mensaje de error después de una eliminación exitosa
     },
@@ -114,6 +78,7 @@ export const CartModal = ({ isOpen, closeModal }) => {
     },
   });
 
+  // Función para eliminar un producto del carrito
   const handleEliminarProducto = (idProducto) => {
     eliminarProducto({
       variables: {
@@ -123,9 +88,9 @@ export const CartModal = ({ isOpen, closeModal }) => {
     });
   };
 
+  // Vaciar carrito en caso de cerrar sesión
   useEffect(() => {
     const handleUserLoggedOut = () => {
-      setCartData([]); // Vaciar el carrito al cerrar sesión
       setProductDetails([]);
       setErrorMessage("Carrito vacío al cerrar sesión.");
     };
@@ -139,7 +104,6 @@ export const CartModal = ({ isOpen, closeModal }) => {
 
   if (!isOpen) return null;
 
-  if (loadingCart) return <p>Cargando...</p>;
   if (errorMessage) return <p>{errorMessage}</p>;
 
   return (
@@ -148,7 +112,7 @@ export const CartModal = ({ isOpen, closeModal }) => {
         <h2 className="text-xl font-semibold mb-4">Carrito de Compras</h2>
 
         {productDetails.length > 0 ? (
-          <ul className="space-y-4  flex-auto">
+          <ul className="space-y-4 flex-auto">
             {productDetails.map((product) => (
               <li key={product.id} className="flex items-center p-4 border-b border-gray-200">
                 <div className="flex-shrink-0">
