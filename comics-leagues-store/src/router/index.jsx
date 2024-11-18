@@ -10,6 +10,7 @@ import UserProfile from '../pages/UserProfile.jsx';
 import Historial from '../components/Historial.jsx';
 import Perfil from '../components/Perfil.jsx';
 import SetPerfil from '../components/SetPerfil.jsx';
+import PaySystem from '../pages/PaySystem.jsx';
 
 export const router= createBrowserRouter([
     {
@@ -58,7 +59,7 @@ export const router= createBrowserRouter([
             },
             {
                 path:'paySystem',
-                element:<div>pagar epicamente anashei</div>
+                element:<PaySystem/>
             },
             
         ]
