@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { cartClient, productClient } from '../apolloClient'; // Ajusta la ruta según tu estructura
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { Button, Checkbox } from "@nextui-org/react";
+import {paymentClient} from '../axiosClient.jsx';
 
 const OBTENER_CARRITO = gql`
   query ObtenerCarrito($id: ID!) {
@@ -163,9 +164,38 @@ const PaySystem = () => {
   if (error) {
     return <p>{errorMessage || 'Error al cargar los datos.'}</p>;
   }
+// Agrega esta función en tu componente
+const iniciarPago = async () => {
+  if (totalPrice <= 0) {
+    alert('No puedes procesar un pago con un total de $0.');
+    return;
+  }
 
+  try {
+    // Realizar la solicitud de pago con solo el monto total
+    const amountInCents = Math.round(totalPrice);
+    const response = await paymentClient.post('/api/pagos/create', {
+      amount: amountInCents, // Solo envía el monto total
+    });
+
+    // Verificar si la respuesta contiene una URL de pago
+    const { paymentUrl } = response.data;
+
+    if (paymentUrl) {
+      // Redirigir al usuario a la página de pago
+      window.location.href = paymentUrl;
+    } else {
+      throw new Error('La URL de pago no fue proporcionada por el servidor.');
+    }
+  } catch (error) {
+    console.error('Error al iniciar el pago:', error);
+    alert(
+      'Hubo un problema al procesar el pago. Por favor, verifica tu conexión a internet o intenta de nuevo más tarde.'
+    );
+  }
+};
   return (
-    <div className="bg-white rounded-lg shadow-lg w-200 max-h-[80vh] overflow-y-auto p-6">
+    <div>
       <h2 className="text-xl font-semibold mb-4">Carrito de Compras</h2>
 
       {productDetails.length > 0 ? (
@@ -206,6 +236,7 @@ const PaySystem = () => {
         <button
           className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700"
           disabled={selectedProducts.length === 0}
+          onClick={iniciarPago}
         >
           Ir a Pagar
         </button>

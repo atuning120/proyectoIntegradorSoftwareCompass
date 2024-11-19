@@ -1,22 +1,35 @@
 import express, { Request, Response } from 'express';
-import asyncHandler from '../utils/async_handler';
+import cors from 'cors'; // Middleware para habilitar CORS
+import asyncHandler from '../utils/async_handler'; // Middleware para manejar async/await
 const WebpayPlus = require("transbank-sdk").WebpayPlus;
 
 const router = express.Router();
 
-// Endpoint para crear una transacción
+// Middleware para habilitar CORS
+router.use(cors({
+    origin: 'http://localhost:3000', // Permitir solicitudes desde el frontend
+    methods: ['GET', 'POST'], // Métodos HTTP permitidos
+    allowedHeaders: ['Content-Type', 'Authorization'], // Encabezados permitidos
+}));
+
+// --- RUTA: Crear una transacción ---
 router.post('/create', asyncHandler(async (req: Request, res: Response) => {
+    const { amount } = req.body;
+
+    // Validar el campo "amount"
+    if (!amount || typeof amount !== 'number') {
+        return res.status(400).json({
+            message: 'El campo "amount" es requerido y debe ser un número válido.',
+        });
+    }
+
     try {
-        const { amount } = req.body;
+        // Generar datos únicos para la transacción
+        const buyOrder = `O-${Math.floor(Math.random() * 10000) + 1}`;
+        const sessionId = `S-${Math.floor(Math.random() * 10000) + 1}`;
+        const returnUrl = `${req.protocol}://${req.get('host')}/api/pagos/commit`;
 
-        if (!amount) {
-            return res.status(400).send('El monto es requerido');
-        }
-
-        let buyOrder = "O-" + Math.floor(Math.random() * 10000) + 1;
-        let sessionId = "S-" + Math.floor(Math.random() * 10000) + 1;
-        let returnUrl = req.protocol + "://" + req.get("host") + "/api/pagos/commit";
-
+        // Crear la transacción con Webpay Plus
         const createResponse = await (new WebpayPlus.Transaction()).create(
             buyOrder,
             sessionId,
@@ -24,62 +37,78 @@ router.post('/create', asyncHandler(async (req: Request, res: Response) => {
             returnUrl
         );
 
+        // Construir la URL de pago
+        const paymentUrl = `${createResponse.url}?token_ws=${createResponse.token}`;
 
-        const token = createResponse.token
-        const url = createResponse.url
-        const paymentUrl = `${url}?token_ws=${token}`
-
-        res.json({
+        // Responder con los detalles de la transacción
+        res.status(201).json({
             buyOrder,
             sessionId,
             amount,
             returnUrl,
-            paymentUrl
+            paymentUrl,
         });
     } catch (error) {
         console.error('Error al crear la transacción:', error);
-        res.status(500).send('Error al crear la transacción');
+        res.status(500).json({
+            message: 'Ocurrió un error al intentar crear la transacción.',
+        });
     }
 }));
 
-// Endpoint para confirmar una transacción
+// --- RUTA: Confirmar una transacción (POST) ---
 router.post('/commit', asyncHandler(async (req: Request, res: Response) => {
+    const { token_ws } = req.body;
+
+    // Validar el campo "token_ws"
+    if (!token_ws) {
+        return res.status(400).json({
+            message: 'El campo "token_ws" es requerido.',
+        });
+    }
+
     try {
-        let { token_ws } = req.body;
-
-        if (!token_ws) {
-            return res.status(400).send('El token_ws es requerido');
-        }
-
+        // Confirmar la transacción con Webpay Plus
         const commitResponse = await (new WebpayPlus.Transaction()).commit(token_ws);
 
-        res.json({
+        // Responder con los detalles de la confirmación
+        res.status(200).json({
             token: token_ws,
             commitResponse,
         });
     } catch (error) {
         console.error('Error al confirmar la transacción:', error);
-        res.status(500).send('Error al confirmar la transacción');
+        res.status(500).json({
+            message: 'Ocurrió un error al intentar confirmar la transacción.',
+        });
     }
 }));
 
+// --- RUTA: Confirmar una transacción (GET) ---
 router.get('/commit', asyncHandler(async (req: Request, res: Response) => {
+    const { token_ws } = req.query;
+
+    // Validar el campo "token_ws"
+    if (!token_ws) {
+        return res.status(400).json({
+            message: 'El parámetro "token_ws" es requerido.',
+        });
+    }
+
     try {
-        let { token_ws } = req.query;
-
-        if (!token_ws) {
-            return res.status(400).send('El token_ws es requerido');
-        }
-
+        // Confirmar la transacción con Webpay Plus
         const commitResponse = await (new WebpayPlus.Transaction()).commit(token_ws);
 
-        res.json({
+        // Responder con los detalles de la confirmación
+        res.status(200).json({
             token: token_ws,
             commitResponse,
         });
     } catch (error) {
         console.error('Error al confirmar la transacción:', error);
-        res.status(500).send('Error al confirmar la transacción');
+        res.status(500).json({
+            message: 'Ocurrió un error al intentar confirmar la transacción.',
+        });
     }
 }));
 

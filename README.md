@@ -20,3 +20,12 @@ npm run dev
 # Resto de los ms
 go mod tidy
 air
+
+# para pagar
+debito
+4051885600446623
+
+Rut
+11.111.111-1
+Contraseña
+123
