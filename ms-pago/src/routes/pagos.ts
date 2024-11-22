@@ -27,7 +27,7 @@ router.post('/create', asyncHandler(async (req: Request, res: Response) => {
         // Generar datos únicos para la transacción
         const buyOrder = `O-${Math.floor(Math.random() * 10000) + 1}`;
         const sessionId = `S-${Math.floor(Math.random() * 10000) + 1}`;
-        const returnUrl = `${req.protocol}://${req.get('host')}/api/pagos/commit`;
+        const returnUrl = `http://localhost:3000/paySystem`;
 
         // Crear la transacción con Webpay Plus
         const createResponse = await (new WebpayPlus.Transaction()).create(
