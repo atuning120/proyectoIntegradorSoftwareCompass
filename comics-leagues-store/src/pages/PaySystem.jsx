@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef  } from 'react';
 import { cartClient, productClient } from '../apolloClient'; // Ajusta la ruta según tu estructura
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { Button, Checkbox } from "@nextui-org/react";
-import {paymentClient} from '../axiosClient.jsx';
+import { paymentClient } from '../axiosClient.jsx';
+//import { useLocation } from 'react-router-dom'; // Para acceder a los parámetros de la URL
 
 const OBTENER_CARRITO = gql`
   query ObtenerCarrito($id: ID!) {
@@ -63,6 +64,9 @@ const PaySystem = () => {
   const [productDetails, setProductDetails] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]); // Estado para productos seleccionados
   const [totalPrice, setTotalPrice] = useState(0); // Estado para el total a pagar
+  const [paymentStatus, setPaymentStatus] = useState(null); // Estado del pago
+  const [loading, setLoading] = useState(false); // Estado de carga
+  const tokenProcessed = useRef(false); // Variable para evitar reejecuciones
 
   // Extraer el id del usuario
   const userId = ExtraerIdUsuario();
@@ -164,36 +168,72 @@ const PaySystem = () => {
   if (error) {
     return <p>{errorMessage || 'Error al cargar los datos.'}</p>;
   }
-// Agrega esta función en tu componente
-const iniciarPago = async () => {
-  if (totalPrice <= 0) {
-    alert('No puedes procesar un pago con un total de $0.');
-    return;
-  }
-
-  try {
-    // Realizar la solicitud de pago con solo el monto total
-    const amountInCents = Math.round(totalPrice);
-    const response = await paymentClient.post('/api/pagos/create', {
-      amount: amountInCents, // Solo envía el monto total
-    });
-
-    // Verificar si la respuesta contiene una URL de pago
-    const { paymentUrl } = response.data;
-
-    if (paymentUrl) {
-      // Redirigir al usuario a la página de pago
-      window.location.href = paymentUrl;
-    } else {
-      throw new Error('La URL de pago no fue proporcionada por el servidor.');
+  // Agrega esta función en tu componente
+  const iniciarPago = async () => {
+    if (totalPrice <= 0) {
+      alert('No puedes procesar un pago con un total de $0.');
+      return;
     }
-  } catch (error) {
-    console.error('Error al iniciar el pago:', error);
-    alert(
-      'Hubo un problema al procesar el pago. Por favor, verifica tu conexión a internet o intenta de nuevo más tarde.'
-    );
-  }
-};
+
+    try {
+      // Realizar la solicitud de pago con solo el monto total
+      const amountInCents = Math.round(totalPrice);
+      const response = await paymentClient.post('/api/pagos/create', {
+        amount: amountInCents, // Solo envía el monto total
+      });
+
+      // Verificar si la respuesta contiene una URL de pago
+      const { paymentUrl } = response.data;
+
+      if (paymentUrl) {
+        // Redirigir al usuario a la página de pago
+        window.location.href = paymentUrl;
+      } else {
+        throw new Error('La URL de pago no fue proporcionada por el servidor.');
+      }
+    } catch (error) {
+      console.error('Error al iniciar el pago:', error);
+      alert(
+        'Hubo un problema al procesar el pago. Por favor, verifica tu conexión a internet o intenta de nuevo más tarde.'
+      );
+    }
+  };
+
+  // Extraer token_ws de la URL si existe
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tokenWs = params.get('token_ws');
+
+    if (tokenWs) {
+      //console.log('Token WS:', tokenWs);
+      if (tokenWs && !tokenProcessed.current) {
+        tokenProcessed.current = true; // Marcar que el token ya se procesó
+        confirmarPago(tokenWs);
+      }
+    }
+  }, [location.search]);
+
+  // Función para confirmar el pago usando GET
+  const confirmarPago = async (tokenWs) => {
+    setLoading(true);
+    try {
+      const response = await paymentClient.get(`/api/pagos/commit?token_ws=${tokenWs}`);
+      const { commitResponse } = response.data;
+
+      if (commitResponse && commitResponse.response_code === 0) {
+        setPaymentStatus('Pago realizado con éxito. Gracias por tu compra.');
+        alert('Pago realizado con éxito. Gracias por tu compra.');
+      } else {
+        setPaymentStatus('No se pudo completar el pago. Por favor, inténtalo de nuevo.');
+        alert('No se pudo completar el pago. Por favor, inténtalo de nuevo.');
+      }
+    } catch (error) {
+      console.error('Error al confirmar el pago:', error);
+      setPaymentStatus('Hubo un problema al confirmar el pago. Intenta de nuevo más tarde.');
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">Carrito de Compras</h2>
