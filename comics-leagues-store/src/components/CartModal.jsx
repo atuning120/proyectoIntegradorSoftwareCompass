@@ -48,7 +48,6 @@ const userId = ExtraerIdUsuario();
 export const CartModal = ({ isOpen, closeModal, cartItems }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [productDetails, setProductDetails] = useState([]);
-
   // Query para obtener los detalles de los productos en el carrito usando cartItems directamente
   const { refetch: refetchProductDetails } = useQuery(CURSOS_POR_ID, {
     variables: { ids: cartItems, userId },

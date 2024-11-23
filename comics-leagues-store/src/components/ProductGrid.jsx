@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { gql, useQuery, useMutation } from '@apollo/client';
 import { productClient, cartClient } from '../apolloClient';
 import { CircularProgress } from "@nextui-org/react";
+import Tostadas from './Tostadas';
+import { ToastContainer } from 'react-toastify';
+import { CartContext } from '../context/CartContext';
 
 // Definir la query GraphQL
 const TOP_CURSOS = gql`
@@ -46,13 +49,16 @@ const ExtraerIdUsuario = () => {
   }
 };
 
+
+
 function ProductGrid() {
   const { loading, error, data } = useQuery(TOP_CURSOS, { client: productClient });
   const [agregarProducto] = useMutation(AGREGAR_PRODUCTO, { client: cartClient });
+  const {cartItems,setCartItems} = useContext(CartContext);
 
   // Estado para controlar qué botón está añadiendo un producto
   const [loadingProduct, setLoadingProduct] = useState(null);
-
+  
   // Mostrar spinner mientras los datos se cargan
   if (loading) return <CircularProgress aria-label="Loading..." />;
 
@@ -70,14 +76,28 @@ function ProductGrid() {
     setLoadingProduct(id); // Establecer el producto que está añadiendo
 
     try {
-      await agregarProducto({
+      Tostadas.ToastInfo("Añadiendo producto al carrito...",1000);
+
+      const prevCartItems = [...cartItems];//guardamos de momento el cartItems anterior
+      const { data } = await agregarProducto({
         variables: {
           IDUsuario: idUsuario,
           IDProducto: id,
         },
       });
+
+
+      setCartItems(data.AgregarProducto.idProductos);
+      
       console.log(`Producto ${id} añadido al carrito`);
+
+      if (prevCartItems.length === cartItems.length && prevCartItems.includes(id)) {
+        Tostadas.ToastWarning("Este producto ya estaba en el carrito", 2000);
+      } else {
+        Tostadas.ToastSuccess("Producto añadido al carrito", 2000);
+      }
     } catch (error) {
+      Tostadas.ToastError("Ocurrió un error al agregar el producto al carrito");
       console.error('Error al añadir al carrito:', error);
     } finally {
       setLoadingProduct(null); // Restablecer el estado de carga
@@ -115,6 +135,7 @@ function ProductGrid() {
           </div>
         ))}
       </div>
+      <ToastContainer/>
     </div>
   );
 }
