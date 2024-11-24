@@ -177,6 +177,9 @@ const PaySystem = () => {
 
     try {
       // Realizar la solicitud de pago con solo el monto total
+      //limpiar el item de aComprar antes de agregarle datos 
+      localStorage.removeItem('aComprar');
+      localStorage.setItem('aComprar', JSON.stringify(productosSeleccionados)); //***************************************************** */
       const amountInCents = Math.round(totalPrice);
       const response = await paymentClient.post('/api/pagos/create', {
         amount: amountInCents, // Solo envía el monto total
@@ -207,6 +210,8 @@ const PaySystem = () => {
     if (tokenWs) {
       //console.log('Token WS:', tokenWs);
       if (tokenWs && !tokenProcessed.current) {
+        const valor = JSON.parse(localStorage.getItem('aComprar'));//datos listos para ser agregados al historial de compara si la compra fue correcta
+        console.log(valor);
         tokenProcessed.current = true; // Marcar que el token ya se procesó
         confirmarPago(tokenWs);
       }
