@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { gql, useQuery, useMutation } from '@apollo/client';
 import { Image, CircularProgress } from "@nextui-org/react";
 import { productClient, cartClient } from '../apolloClient';
+import Tostadas from '../components/Tostadas.js';
+import { CartContext } from '../context/CartContext.jsx';
+import { ToastContainer } from 'react-toastify';
 
 // Definir la query GraphQL
 const GET_CURSOS = gql`
@@ -54,6 +57,7 @@ const CursosPage = () => {
   const [selectedLevel, setSelectedLevel] = useState('');
   const [sortOrder, setSortOrder] = useState('');
   const [loadingProduct, setLoadingProduct] = useState(null);
+  const {cartItems,setCartItems} = useContext(CartContext);
 
   // Manejar el cambio de filtros
   const handleFilterChange = (e) => setSelectedCourse(e.target.value);
@@ -69,6 +73,9 @@ const CursosPage = () => {
     setLoadingProduct(id); // Establecer el producto que está añadiendo
 
     try {
+      Tostadas.ToastInfo("Añadiendo producto al carrito...",1000);
+      const prevCartItems = [...cartItems];//guardamos de momento el cartItems anterior
+
       await agregarProducto({
         variables: {
           IDUsuario: idUsuario,
@@ -76,6 +83,12 @@ const CursosPage = () => {
         },
       });
       console.log(`Producto ${id} añadido al carrito`);
+      if (prevCartItems.length === cartItems.length && prevCartItems.includes(id)) {
+        Tostadas.ToastWarning("Este producto ya estaba en el carrito", 2000);
+      } else {
+        Tostadas.ToastSuccess("Producto añadido al carrito", 2000);
+      }
+      setCartItems(data.AgregarProducto.idProductos);
     } catch (error) {
       console.error('Error al añadir al carrito:', error);
     } finally {
@@ -211,6 +224,7 @@ const CursosPage = () => {
           </div>
         ))}
       </div>
+      <ToastContainer/>
     </div>
   );
 };
