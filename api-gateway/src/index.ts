@@ -44,6 +44,17 @@ app.all("/carrito", (req: Request, res: Response, next: NextFunction) => {
     }); 
 });
 
+//redirige a las peticiones para ms-historial
+app.all("/historial", (req: Request, res: Response, next: NextFunction) => {
+    req.url = req.url.replace('/historial', ''); // Elimina el prefijo para la redirección
+    apiProxy.web(req, res, { target: 'http://localhost:8083/query' }, function(e) {
+        if (e) {
+            console.error(e);
+            next(e);
+        }
+    });
+});
+
 // Redirige al ms-pago
 app.all("/pago", (req: Request, res: Response, next: NextFunction) => {
     req.url = req.url.replace('/pago', ''); // Elimina el prefijo para la redirección

@@ -1,3 +1,15 @@
+type Historial {
+    id: ID!
+    idUsuario: ID!
+    fecha: String!
+    idProductos: [ID!]!
+}
+
 type Query {
-    hello: String!
+    ObtenerHistoriales: [Historial!]!
+    ObtenerHistorialPorUsuario(idUsuario: ID!): [Historial!]!
+}
+
+type Mutation {
+    crearHistorial(idUsuario: ID!, idProductos: [ID!]!): Historial!
 }

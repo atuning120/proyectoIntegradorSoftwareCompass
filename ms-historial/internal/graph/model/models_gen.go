@@ -2,5 +2,15 @@
 
 package model
 
+type Historial struct {
+	ID          string   `json:"id"`
+	IDUsuario   string   `json:"idUsuario"`
+	Fecha       string   `json:"fecha"`
+	IDProductos []string `json:"idProductos"`
+}
+
+type Mutation struct {
+}
+
 type Query struct {
 }

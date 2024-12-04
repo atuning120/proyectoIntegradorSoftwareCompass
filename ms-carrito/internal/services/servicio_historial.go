@@ -14,6 +14,7 @@ type ServicioHistorial interface {
 	AnadirProduct(ctx context.Context, idUsuario string, idProducto string) (bool, error)
 	EliminarProducto(ctx context.Context, idUsuario string, idProducto string) (bool, error)
 	EliminarProductos(ctx context.Context, idUsuario string) (bool, error)
+	EliminarProductosComprados(ctx context.Context, idUsuario string, idProductos []string) (bool, error)
 }
 
 type ServicioHistorialImpl struct {
@@ -103,4 +104,16 @@ func (s *ServicioHistorialImpl) CreacionCarrito(ctx context.Context, idUsuario s
 	}
 
 	return true, nil
+}
+
+func (s *ServicioHistorialImpl) EliminarProductosComprados(ctx context.Context, idUsuario string, idProductos []string) (bool, error) {
+
+	_, err := s.Repository.DeletePuchasedProducts(ctx, idUsuario, idProductos)
+	if err != nil {
+		fmt.Printf("Error al eliminar los productos comprados del carrito: %v\n", err)
+		return false, fmt.Errorf("error al eliminar los productos comprados del carrito: %v", err)
+	}
+
+	return true, nil
+
 }
