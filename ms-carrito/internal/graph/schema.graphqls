@@ -14,6 +14,11 @@ input EliminarProductoInput {
   IDProducto: ID!
 }
 
+input VaciarCarritoComprado {
+  IDUsuario: ID!
+  IDProductos : [ID!]!
+}
+
 type Query {
   ObtenerCarritos: [Carrito!]!
   ObtenerCarrito(id: ID!): Carrito 
@@ -24,4 +29,5 @@ type Mutation {
   AgregarProducto(input: AgregarProductoInput!): Carrito!
   EliminarProducto(input: EliminarProductoInput!): Carrito!
   VaciarCarrito(idUsuario: ID!): Carrito!
+  VaciarProductosComprados(input: VaciarCarritoComprado): Carrito!
 }

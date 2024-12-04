@@ -17,6 +17,7 @@ type HistorialRepository interface {
 	FindByIdCarrito(ctx context.Context, id string) (models.Carrito, error)
 	DeleteOneProduct(ctx context.Context, id string, carrito models.Carrito) (bool, error)
 	DeleteAllProducts(ctx context.Context, id string) (bool, error)
+	DeletePuchasedProducts(ctx context.Context, id string, idProductos []string) (bool, error)
 }
 
 type HistorialRepositoryImpl struct {
@@ -165,5 +166,41 @@ func (s *HistorialRepositoryImpl) InsertOne(ctx context.Context, historial model
 		return false, err
 	}
 
+	return true, nil
+}
+
+func (s *HistorialRepositoryImpl) DeletePuchasedProducts(ctx context.Context, id string, idProductos []string) (bool, error) {
+
+	objectIdUsuario, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		fmt.Printf("Error al convertir id a ObjectID: %v\n", err)
+		return false, fmt.Errorf("error al convertir id a ObjectID: %v", err)
+	}
+
+	objectIdProductos := make([]primitive.ObjectID, 0)
+	for _, idProducto := range idProductos {
+		objectIdProducto, err := primitive.ObjectIDFromHex(idProducto)
+		if err != nil {
+			fmt.Printf("Error al convertir id a ObjectID: %v\n", err)
+			return false, fmt.Errorf("error al convertir id a ObjectID: %v", err)
+		}
+		objectIdProductos = append(objectIdProductos, objectIdProducto)
+	}
+
+	filter := bson.M{"id_usuario": objectIdUsuario}
+	update := bson.M{"$pull": bson.M{"id_productos": bson.M{"$in": objectIdProductos}}}
+
+	result, err := s.Collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		fmt.Printf("Error en UpdateOne: %v\n", err)
+		return false, err
+	}
+
+	if result.ModifiedCount == 0 {
+		fmt.Println("No se encontró el producto en el carrito.")
+		return false, nil
+	}
+
+	fmt.Println("Producto eliminado correctamente del carrito.")
 	return true, nil
 }

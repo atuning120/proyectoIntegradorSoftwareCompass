@@ -23,3 +23,8 @@ type Mutation struct {
 
 type Query struct {
 }
+
+type VaciarCarritoComprado struct {
+	IDUsuario   string   `json:"IDUsuario"`
+	IDProductos []string `json:"IDProductos"`
+}

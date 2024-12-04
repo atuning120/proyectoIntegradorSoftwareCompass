@@ -18,4 +18,9 @@ const cartClient = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
+const historialClient = new ApolloClient({
+  uri: 'http://localhost:3002/historial',
+  cache: new InMemoryCache(),
+});
+
 export { userClient, cartClient, productClient };
