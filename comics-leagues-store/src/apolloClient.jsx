@@ -23,4 +23,4 @@ const historialClient = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-export { userClient, cartClient, productClient };
+export { userClient, cartClient, productClient ,historialClient};

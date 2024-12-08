@@ -7,7 +7,7 @@ import Tostadas from './Tostadas';
 import { ToastContainer } from "react-toastify";
 
 
-// Función para verificar si el usuario está autenticado
+//verificar si el usuario esta autenticado
 const isAuthenticated = () => {
     try {
         return localStorage.getItem('token');
@@ -98,7 +98,7 @@ const SetPerfil = () => {
     }, [token]);
 
     if (loading) {
-        return <CircularProgress aria-label="Loading..." />;
+        return <CircularProgress aria-label="Cargando..." />;
     }
 
 

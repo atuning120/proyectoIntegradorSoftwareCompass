@@ -32,7 +32,7 @@ const Sidebar = () =>{
     };
 
     return(
-        <div className="w-72">
+        <div className="w-72 position: fixed">
             <div className={`bg-gray-950 h-screen p-5 pt-8 ${isOpen? "w-72":"w-28"} duration-300 relative`}>
                 <BsArrowLeftSquareFill  className={`bg-gray-900 text-gray-200 
                 text-3xl rounded-full absolute -right-5 top-10 border
@@ -66,7 +66,7 @@ const Sidebar = () =>{
                         className={`text-gray-300 text-sm flex
                         items-center gap-x-4 cursor-pointer p-2
                         hover:bg-white rounded-md 
-                        ${menu.spacing ? "mt-48":"mt-2"}`}
+                        ${menu.spacing ? "mt-36":"mt-2"}`}
                         onClick={() => menu.isExitButton ? handleLogout() : navigate(menu.link)
                         }
                     >
