@@ -1,12 +1,25 @@
+// ProductGrid.jsx
 import React, { useContext, useState } from 'react';
 import { gql, useQuery, useMutation } from '@apollo/client';
-import { productClient, cartClient } from '../apolloClient';
+import { productClient, cartClient, historialClient } from '../apolloClient'; // Asegúrate de importar historialClient
 import { CircularProgress } from "@nextui-org/react";
 import Tostadas from './Tostadas';
 import { ToastContainer } from 'react-toastify';
 import { CartContext } from '../context/CartContext';
 
-// Definir la query GraphQL
+// Definir la query GraphQL para obtener el historial de compras del usuario
+const OBTENER_HISTORIAL_POR_USUARIO = gql`
+  query ObtenerHistorialPorUsuario($idUsuario: ID!) {
+    ObtenerHistorialPorUsuario(idUsuario: $idUsuario) {
+      id
+      idUsuario
+      fecha
+      idProductos
+    }
+  }
+`;
+
+// Definir la query GraphQL para obtener los cursos destacados
 const TOP_CURSOS = gql`
   query TopCursos {
     topCursos {
@@ -49,46 +62,74 @@ const ExtraerIdUsuario = () => {
   }
 };
 
-
-
 function ProductGrid() {
   const { loading, error, data } = useQuery(TOP_CURSOS, { client: productClient });
   const [agregarProducto] = useMutation(AGREGAR_PRODUCTO, { client: cartClient });
-  const {cartItems,setCartItems} = useContext(CartContext);
+  const { cartItems, setCartItems } = useContext(CartContext);
 
   // Estado para controlar qué botón está añadiendo un producto
   const [loadingProduct, setLoadingProduct] = useState(null);
-  
-  // Mostrar spinner mientras los datos se cargan
-  if (loading) return <CircularProgress aria-label="Loading..." />;
 
-  // Manejar errores de la query
+  // Obtener el ID del usuario
+  const idUsuario = ExtraerIdUsuario();
+
+  // Utilizar la consulta para obtener el historial de compras del usuario
+  const {
+    data: historialData,
+    loading: historialLoading,
+    error: historialError,
+  } = useQuery(OBTENER_HISTORIAL_POR_USUARIO, {
+    variables: { idUsuario },
+    skip: !idUsuario, // Omitir la consulta si no hay usuario
+    client: historialClient, // Asegúrate de tener configurado historialClient
+    fetchPolicy: 'network-only', // Opcional: para asegurar datos actualizados
+  });
+
+  // Mostrar spinner mientras los datos se cargan
+  if (loading || historialLoading) return <CircularProgress aria-label="Loading..." />;
+
+  // Manejar errores de las queries
   if (error) {
     console.error('Error al cargar los cursos:', error);
     return <p>Error al cargar los cursos. Intenta nuevamente más tarde.</p>;
   }
 
+  if (historialError) {
+    console.error('Error al cargar el historial de compras:', historialError);
+    // Puedes optar por mostrar un mensaje o continuar sin el historial
+  }
+
+  // Obtener todos los IDs de productos que el usuario ya ha comprado
+  const productosCompradosPrevios = historialData?.ObtenerHistorialPorUsuario?.reduce((acc, historial) => {
+    return acc.concat(historial.idProductos);
+  }, []) || [];
+
   // Función para añadir un producto al carrito
   const AddCarritoFunc = async (id) => {
-    const idUsuario = ExtraerIdUsuario();
-    if (!idUsuario) return; // No ejecutar si no hay usuario
+    const idUsuarioActual = ExtraerIdUsuario();
+    if (!idUsuarioActual) return; // No ejecutar si no hay usuario
+
+    // Verificar si el producto ya ha sido comprado
+    if (productosCompradosPrevios.includes(id)) {
+      Tostadas.ToastWarning("Este producto ya ha sido comprado anteriormente y no puede ser añadido al carrito.", 3000);
+      return;
+    }
 
     setLoadingProduct(id); // Establecer el producto que está añadiendo
 
     try {
-      Tostadas.ToastInfo("Añadiendo producto al carrito...",1000);
+      Tostadas.ToastInfo("Añadiendo producto al carrito...", 1000);
 
-      const prevCartItems = [...cartItems];//guardamos de momento el cartItems anterior
+      const prevCartItems = [...cartItems]; // Guardar el cartItems anterior
       const { data } = await agregarProducto({
         variables: {
-          IDUsuario: idUsuario,
+          IDUsuario: idUsuarioActual,
           IDProducto: id,
         },
       });
 
-
       setCartItems(data.AgregarProducto.idProductos);
-      
+
       console.log(`Producto ${id} añadido al carrito`);
 
       if (prevCartItems.length === cartItems.length && prevCartItems.includes(id)) {
@@ -135,7 +176,7 @@ function ProductGrid() {
           </div>
         ))}
       </div>
-      <ToastContainer/>
+      <ToastContainer />
     </div>
   );
 }

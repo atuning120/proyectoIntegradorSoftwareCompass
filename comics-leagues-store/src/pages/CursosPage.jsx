@@ -1,12 +1,12 @@
 import React, { useContext, useState } from 'react';
 import { gql, useQuery, useMutation } from '@apollo/client';
 import { Image, CircularProgress } from "@nextui-org/react";
-import { productClient, cartClient } from '../apolloClient';
+import { productClient, cartClient, historialClient } from '../apolloClient'; // Importar historialClient
 import Tostadas from '../components/Tostadas.js';
 import { CartContext } from '../context/CartContext.jsx';
 import { ToastContainer } from 'react-toastify';
 
-// Definir la query GraphQL
+// Query para obtener cursos
 const GET_CURSOS = gql`
   query GetCursos {
     cursos {
@@ -21,7 +21,19 @@ const GET_CURSOS = gql`
   }
 `;
 
-// Definir la mutación para agregar un producto
+// Query para obtener el historial de compras del usuario
+const OBTENER_HISTORIAL_POR_USUARIO = gql`
+  query ObtenerHistorialPorUsuario($idUsuario: ID!) {
+    ObtenerHistorialPorUsuario(idUsuario: $idUsuario) {
+      id
+      idUsuario
+      fecha
+      idProductos
+    }
+  }
+`;
+
+// Mutación para agregar producto
 const AGREGAR_PRODUCTO = gql`
   mutation AgregarProducto($IDUsuario: ID!, $IDProducto: ID!) {
     AgregarProducto(input: { IDUsuario: $IDUsuario, IDProducto: $IDProducto }) {
@@ -59,16 +71,52 @@ const CursosPage = () => {
   const [loadingProduct, setLoadingProduct] = useState(null);
   const {cartItems,setCartItems} = useContext(CartContext);
 
+  // Obtener el ID del usuario
+  const idUsuario = ExtraerIdUsuario();
+
+  // Obtener el historial de compras del usuario
+  const {
+    data: historialData,
+    loading: historialLoading,
+    error: historialError,
+  } = useQuery(OBTENER_HISTORIAL_POR_USUARIO, {
+    variables: { idUsuario },
+    skip: !idUsuario, 
+    client: historialClient,
+    fetchPolicy: 'network-only',
+  });
+
   // Manejar el cambio de filtros
   const handleFilterChange = (e) => setSelectedCourse(e.target.value);
   const handleCategoryChange = (e) => setSelectedCategory(e.target.value);
   const handleLevelChange = (e) => setSelectedLevel(e.target.value);
   const handleSortOrderChange = (e) => setSortOrder(e.target.value);
 
-  // Función para añadir un producto al carrito
+  // Mostrar spinner mientras los datos se cargan
+  if (loading || historialLoading) return <CircularProgress aria-label="Loading..." />;
+
+  // Manejar errores de las queries
+  if (error) return <p>Error al cargar los cursos: {error.message}</p>;
+  if (historialError) {
+    console.error('Error al cargar el historial de compras:', historialError);
+    // Podrías optar por mostrar un mensaje o continuar la ejecución sin el historial
+  }
+
+  // Obtener todos los IDs de productos que el usuario ya ha comprado
+  const productosCompradosPrevios = historialData?.ObtenerHistorialPorUsuario?.reduce((acc, historial) => {
+    return acc.concat(historial.idProductos);
+  }, []) || [];
+
+  // Función para añadir un producto al carrito, verificando el historial
   const AddCarritoFunc = async (id) => {
-    const idUsuario = ExtraerIdUsuario();
-    if (!idUsuario) return; // No ejecutar si no hay usuario
+    const idUsuarioActual = ExtraerIdUsuario();
+    if (!idUsuarioActual) return; // No ejecutar si no hay usuario
+
+    // Verificar si el producto ya ha sido comprado
+    if (productosCompradosPrevios.includes(id)) {
+      Tostadas.ToastWarning("Este producto ya ha sido comprado anteriormente y no puede ser añadido al carrito.", 3000);
+      return;
+    }
 
     setLoadingProduct(id); // Establecer el producto que está añadiendo
 
@@ -76,28 +124,28 @@ const CursosPage = () => {
       Tostadas.ToastInfo("Añadiendo producto al carrito...",1000);
       const prevCartItems = [...cartItems];//guardamos de momento el cartItems anterior
 
-      await agregarProducto({
+      const { data: cartUpdateData } = await agregarProducto({
         variables: {
-          IDUsuario: idUsuario,
+          IDUsuario: idUsuarioActual,
           IDProducto: id,
         },
       });
+
       console.log(`Producto ${id} añadido al carrito`);
+      setCartItems(cartUpdateData.AgregarProducto.idProductos);
+
       if (prevCartItems.length === cartItems.length && prevCartItems.includes(id)) {
         Tostadas.ToastWarning("Este producto ya estaba en el carrito", 2000);
       } else {
         Tostadas.ToastSuccess("Producto añadido al carrito", 2000);
       }
-      setCartItems(data.AgregarProducto.idProductos);
     } catch (error) {
+      Tostadas.ToastError("Ocurrió un error al agregar el producto al carrito");
       console.error('Error al añadir al carrito:', error);
     } finally {
       setLoadingProduct(null); // Restablecer el estado de carga
     }
   };
-
-  if (loading) return <CircularProgress aria-label="Loading..." />;
-  if (error) return <p>Error al cargar los cursos: {error.message}</p>;
 
   const products = data.cursos;
 
@@ -206,7 +254,7 @@ const CursosPage = () => {
               </p>
             </div>
 
-            {/* Contenedor de precio y botón, siempre alineados al fondo */}
+            {/* Contenedor de precio y botón */}
             <div className="mt-auto">
               <div className="mt-4">
                 <span className="text-xl font-bold">

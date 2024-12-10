@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef  } from 'react';
-import { cartClient, productClient } from '../apolloClient'; // Ajusta la ruta según tu estructura
+// PaySystem.jsx
+import React, { useEffect, useState, useRef } from 'react';
+import { cartClient, productClient, historialClient } from '../apolloClient'; 
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { Button, Checkbox } from "@nextui-org/react";
 import { paymentClient } from '../axiosClient.jsx';
-//import { useLocation } from 'react-router-dom'; // Para acceder a los parámetros de la URL
+import { useLocation } from 'react-router-dom'; 
 
 const OBTENER_CARRITO = gql`
   query ObtenerCarrito($id: ID!) {
@@ -40,6 +41,28 @@ const ELIMINAR_PRODUCTO = gql`
   }
 `;
 
+const CREAR_HISTORIAL = gql`
+  mutation CrearHistorial($idUsuario: ID!, $idProductos: [ID!]!) {
+    crearHistorial(idUsuario: $idUsuario, idProductos: $idProductos) {
+      id
+      idUsuario
+      fecha
+      idProductos
+    }
+  }
+`;
+
+const OBTENER_HISTORIAL_POR_USUARIO = gql`
+  query ObtenerHistorialPorUsuario($idUsuario: ID!) {
+    ObtenerHistorialPorUsuario(idUsuario: $idUsuario) {
+      id
+      idUsuario
+      fecha
+      idProductos
+    }
+  }
+`;
+
 const isAuthenticated = () => {
   const token = localStorage.getItem('token');
   return !!token;
@@ -55,23 +78,21 @@ const ExtraerIdUsuario = () => {
   }
 };
 
-// Define una constante exportable para los productos seleccionados
 export let productosSeleccionados = [];
 
 const PaySystem = () => {
   const [cartData, setCartData] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [productDetails, setProductDetails] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]); // Estado para productos seleccionados
-  const [totalPrice, setTotalPrice] = useState(0); // Estado para el total a pagar
-  const [paymentStatus, setPaymentStatus] = useState(null); // Estado del pago
-  const [loading, setLoading] = useState(false); // Estado de carga
-  const tokenProcessed = useRef(false); // Variable para evitar reejecuciones
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [loading, setLoading] = useState(false); 
+  const tokenProcessed = useRef(false);
+  const location = useLocation();
 
-  // Extraer el id del usuario
   const userId = ExtraerIdUsuario();
 
-  // Obtener el carrito del usuario
   const { data, error, refetch: refetchCart } = useQuery(OBTENER_CARRITO, {
     variables: { id: userId },
     skip: !userId,
@@ -87,7 +108,6 @@ const PaySystem = () => {
     },
   });
 
-  // Obtener los detalles de los productos
   const { refetch: refetchProductDetails } = useQuery(CURSOS_POR_ID, {
     variables: { ids: cartData, userId },
     skip: cartData.length === 0 || !userId,
@@ -103,45 +123,52 @@ const PaySystem = () => {
     },
   });
 
-  // Eliminar producto del carrito
-  const [eliminarProducto] = useMutation(ELIMINAR_PRODUCTO, {
-    onCompleted: (data) => {
-      if (data && data.EliminarProducto) {
-        const updatedCart = data.EliminarProducto.idProductos;
-        setCartData(updatedCart);
-        refetchProductDetails({ ids: updatedCart, userId });
-      }
+  const { data: historialData, error: historialError, loading: historialLoading } = useQuery(OBTENER_HISTORIAL_POR_USUARIO, {
+    variables: { idUsuario: userId },
+    skip: !userId,
+    client: historialClient,
+    onError: (error) => {
+      console.error('Error al cargar el historial de compras:', error);
+      setErrorMessage('Error al cargar el historial de compras.');
     },
+  });
+
+  const [eliminarProducto] = useMutation(ELIMINAR_PRODUCTO, {
+    client: cartClient,
     onError: (error) => {
       console.error('Error al eliminar producto:', error);
       setErrorMessage('Error al eliminar el producto.');
     },
   });
 
-  // Manejar eliminación de producto
+  const [crearHistorialMutation] = useMutation(CREAR_HISTORIAL, {
+    client: historialClient,
+    onError: (error) => {
+      console.error('Error al crear historial:', error);
+      setErrorMessage('Error al crear historial de compras.');
+    },
+  });
+
   const handleEliminarProducto = (productId) => {
     eliminarProducto({
       variables: {
         input: { IDUsuario: userId, IDProducto: productId },
       },
-      client: cartClient,
     });
   };
 
-  // Manejar selección de producto
   const handleCheckboxChange = (productId) => {
     setSelectedProducts((prevSelected) => {
       const isSelected = prevSelected.includes(productId);
       const updatedSelection = isSelected
-        ? prevSelected.filter((id) => id !== productId) // Desmarcar
-        : [...prevSelected, productId]; // Marcar
-      productosSeleccionados = updatedSelection; // Actualizar constante exportable
-      calculateTotalPrice(updatedSelection); // Recalcular el precio total
+        ? prevSelected.filter((id) => id !== productId)
+        : [...prevSelected, productId];
+      productosSeleccionados = updatedSelection; 
+      calculateTotalPrice(updatedSelection);
       return updatedSelection;
     });
   };
 
-  // Calcular el precio total
   const calculateTotalPrice = (selectedIds) => {
     const total = productDetails
       .filter((product) => selectedIds.includes(product.id))
@@ -149,13 +176,13 @@ const PaySystem = () => {
     setTotalPrice(total);
   };
 
-  // Limpiar el carrito al cerrar sesión
   useEffect(() => {
     const handleUserLoggedOut = () => {
       setCartData([]);
       setProductDetails([]);
       setSelectedProducts([]);
-      setTotalPrice(0); // Reiniciar total
+      setTotalPrice(0);
+      localStorage.removeItem('aComprar');
     };
 
     window.addEventListener('userLoggedOut', handleUserLoggedOut);
@@ -165,61 +192,69 @@ const PaySystem = () => {
     };
   }, []);
 
-  if (error) {
+  if (error || historialError) {
     return <p>{errorMessage || 'Error al cargar los datos.'}</p>;
   }
-  // Agrega esta función en tu componente
+
   const iniciarPago = async () => {
     if (totalPrice <= 0) {
       alert('No puedes procesar un pago con un total de $0.');
       return;
     }
 
+    if (historialLoading) {
+      alert('Cargando historial de compras. Por favor, espera un momento.');
+      return;
+    }
+
+    const productosCompradosPrevios = historialData?.ObtenerHistorialPorUsuario?.reduce((acc, historial) => {
+      return acc.concat(historial.idProductos);
+    }, []) || [];
+
+    const productosYaComprados = selectedProducts.filter(productId => productosCompradosPrevios.includes(productId));
+
+    if (productosYaComprados.length > 0) {
+      alert('No puedes comprar los mismos productos más de una vez. Los siguientes productos ya han sido comprados: ' + productosYaComprados.join(', '));
+      return;
+    }
+
     try {
-      // Realizar la solicitud de pago con solo el monto total
-      //limpiar el item de aComprar antes de agregarle datos 
+      setLoading(true);
       localStorage.removeItem('aComprar');
-      localStorage.setItem('aComprar', JSON.stringify(productosSeleccionados)); //***************************************************** */
-      const amountInCents = Math.round(totalPrice);
+      localStorage.setItem('aComprar', JSON.stringify(selectedProducts));
+      const amountInCents = Math.round(totalPrice * 100);
       const response = await paymentClient.post('/api/pagos/create', {
-        amount: amountInCents, // Solo envía el monto total
+        amount: amountInCents,
       });
 
-      // Verificar si la respuesta contiene una URL de pago
       const { paymentUrl } = response.data;
 
       if (paymentUrl) {
-        // Redirigir al usuario a la página de pago
         window.location.href = paymentUrl;
       } else {
         throw new Error('La URL de pago no fue proporcionada por el servidor.');
       }
     } catch (error) {
       console.error('Error al iniciar el pago:', error);
-      alert(
-        'Hubo un problema al procesar el pago. Por favor, verifica tu conexión a internet o intenta de nuevo más tarde.'
-      );
+      alert('Hubo un problema al procesar el pago. Por favor, verifica tu conexión a internet o intenta de nuevo más tarde.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Extraer token_ws de la URL si existe
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tokenWs = params.get('token_ws');
 
-    if (tokenWs) {
-      //console.log('Token WS:', tokenWs);
-      if (tokenWs && !tokenProcessed.current) {
-        const valor = JSON.parse(localStorage.getItem('aComprar'));//datos listos para ser agregados al historial de compara si la compra fue correcta
-        console.log(valor);
-        tokenProcessed.current = true; // Marcar que el token ya se procesó
-        confirmarPago(tokenWs);
-      }
+    if (tokenWs && !tokenProcessed.current) {
+      const valor = JSON.parse(localStorage.getItem('aComprar'));
+      console.log(valor);
+      tokenProcessed.current = true; 
+      confirmarPago(tokenWs, valor);
     }
   }, [location.search]);
 
-  // Función para confirmar el pago usando GET
-  const confirmarPago = async (tokenWs) => {
+  const confirmarPago = async (tokenWs, productosComprados) => {
     setLoading(true);
     try {
       const response = await paymentClient.get(`/api/pagos/commit?token_ws=${tokenWs}`);
@@ -227,7 +262,41 @@ const PaySystem = () => {
 
       if (commitResponse && commitResponse.response_code === 0) {
         setPaymentStatus('Pago realizado con éxito. Gracias por tu compra.');
-        alert('Pago realizado con éxito. Gracias por tu compra.');
+
+        if (userId && productosComprados && productosComprados.length > 0) {
+          // 1. Eliminar los productos comprados del carrito
+          const eliminarPromesas = productosComprados.map((productId) =>
+            eliminarProducto({
+              variables: {
+                input: { IDUsuario: userId, IDProducto: productId },
+              },
+            })
+          );
+
+          // Esperar a que todas las eliminaciones se completen
+          await Promise.all(eliminarPromesas);
+
+          // 2. Refetch el carrito y los detalles de los productos
+          await refetchCart();
+          await refetchProductDetails({ ids: cartData, userId });
+
+          // 3. Crear una entrada en el historial de compras
+          await crearHistorialMutation({
+            variables: {
+              idUsuario: userId,
+              idProductos: productosComprados,
+            },
+          });
+
+          // 4. Limpiar la lista 'aComprar' de localStorage
+          localStorage.removeItem('aComprar');
+
+          // 5. Resetear estados locales
+          setSelectedProducts([]);
+          productosSeleccionados = [];
+          setTotalPrice(0);
+          window.location.reload()
+        }
       } else {
         setPaymentStatus('No se pudo completar el pago. Por favor, inténtalo de nuevo.');
         alert('No se pudo completar el pago. Por favor, inténtalo de nuevo.');
@@ -239,8 +308,9 @@ const PaySystem = () => {
       setLoading(false);
     }
   };
+
   return (
-    <div>
+    <div className="container mx-auto p-4">
       <h2 className="text-xl font-semibold mb-4">Carrito de Compras</h2>
 
       {productDetails.length > 0 ? (
@@ -259,7 +329,7 @@ const PaySystem = () => {
                 <p className="text-sm text-gray-500">{product.descripcion}</p>
               </div>
               <div className="text-right">
-                <span className="text-lg font-semibold text-cyan-600">${product.precio}</span>
+                <span className="text-lg font-semibold text-cyan-600">${product.precio.toFixed(2)}</span>
               </div>
 
               <Button className="ml-4 px-2 py-1" color="danger" onClick={() => handleEliminarProducto(product.id)}>
@@ -286,6 +356,18 @@ const PaySystem = () => {
           Ir a Pagar
         </button>
       </div>
+
+      {paymentStatus && (
+        <div className={`mt-4 p-4 rounded-md ${paymentStatus.includes('éxito') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {paymentStatus}
+        </div>
+      )}
+
+      {loading && (
+        <div className="mt-4 p-4 bg-yellow-100 text-yellow-800 rounded-md">
+          Procesando tu pago...
+        </div>
+      )}
     </div>
   );
 };
