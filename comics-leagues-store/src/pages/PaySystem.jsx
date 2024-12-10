@@ -155,6 +155,7 @@ const PaySystem = () => {
         input: { IDUsuario: userId, IDProducto: productId },
       },
     });
+    window.location.reload();
   };
 
   const handleCheckboxChange = (productId) => {
@@ -222,7 +223,7 @@ const PaySystem = () => {
       setLoading(true);
       localStorage.removeItem('aComprar');
       localStorage.setItem('aComprar', JSON.stringify(selectedProducts));
-      const amountInCents = Math.round(totalPrice * 100);
+      const amountInCents = Math.ceil(totalPrice);
       const response = await paymentClient.post('/api/pagos/create', {
         amount: amountInCents,
       });
