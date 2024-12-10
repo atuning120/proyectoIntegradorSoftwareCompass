@@ -63,6 +63,18 @@ const Historial = () =>{
   };
   
 
+  const formatFecha = (fecha) => {
+    const date = new Date(fecha);
+    return date.toLocaleString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  };
+
     
 
     if (loading) return <CircularProgress aria-label="Cargando..." />;
@@ -70,7 +82,7 @@ const Historial = () =>{
     
 
     return(
-        <div className="ml-72">
+        <div className="">
             <h1 className="text-gray-700 font-semibold text-3xl ml-8 mb-12">
                 Historial de compras
             </h1>
@@ -83,6 +95,7 @@ const Historial = () =>{
             {data && historiales && historiales.length > 0 && historiales.map((historialActual,index)=>{
                 return(
                     <div key={index} className="ml-8 mb-6">
+                       <p className="mb-4">Fecha de compra: {formatFecha(historialActual.fecha)}</p>
                         {historialActual.idProductos.map((productoActualID,index2) => {
                             return(
                                 <RenderProduct
@@ -92,7 +105,6 @@ const Historial = () =>{
                                 />
                             );
                         })}
-                        <p className="mb-4">Fecha de compra: {historialActual.fecha}</p>
                     </div>
                 );
             })}
